@@ -7,10 +7,12 @@ import toast from 'react-hot-toast';
 import SectionModal from '../components/SectionModal';
 
 interface Section {
-  section_number: string;
-  chapter: string;
-  section_title: string;
-  content: string;
+  section_number: string;  // Will use IPC Section
+  chapter: string;        // Will use BNS Section as chapter reference
+  section_title: string;  // Will use IPC Heading
+  content: string;        // Will use IPC Descriptions
+  bns_heading?: string;   // Optional BNS Heading
+  bns_description?: string; // Optional BNS description
 }
 
 const ITEMS_PER_PAGE = 12;
@@ -38,16 +40,12 @@ export default function LegalCode() {
 
   const fetchSections = async () => {
     try {
-      console.log('Fetching sections...'); // Debug log
-      console.log('User:', user); // Debug log
+      console.log('Fetching sections...'); 
 
-      // First, let's try to get the count of rows
       const { count, error: countError } = await supabase
         .from('sections')
         .select('*', { count: 'exact', head: true });
 
-      console.log('Total count:', count); // Debug log
-      
       if (countError) {
         console.error('Count error:', countError);
         throw countError;
@@ -55,10 +53,15 @@ export default function LegalCode() {
 
       const { data, error } = await supabase
         .from('sections')
-        .select('section_number, chapter, section_title, content')
-        .order('section_number');
-
-      console.log('Query result:', { data, error }); // Debug log
+        .select(`
+          "IPC Section",
+          "BNS Section",
+          "IPC Heading",
+          "IPC Descriptions",
+          "BNS Heading",
+          "BNS description"
+        `)
+        .order('"IPC Section"');
 
       if (error) {
         console.error('Supabase error:', error);
@@ -66,10 +69,18 @@ export default function LegalCode() {
       }
 
       if (data) {
-        console.log('Fetched sections count:', data.length);
-        setSections(data);
-        setFilteredSections(data);
-        setTotalPages(Math.ceil(data.length / ITEMS_PER_PAGE));
+        const transformedData: Section[] = data.map(item => ({
+          section_number: item['IPC Section'] || '',
+          chapter: item['BNS Section'] || '',
+          section_title: item['IPC Heading'] || '',
+          content: item['IPC Descriptions'] || '',
+          bns_heading: item['BNS Heading'],
+          bns_description: item['BNS description']
+        }));
+
+        setSections(transformedData);
+        setFilteredSections(transformedData);
+        setTotalPages(Math.ceil(transformedData.length / ITEMS_PER_PAGE));
       }
     } catch (error: any) {
       console.error('Error details:', error);
@@ -85,7 +96,9 @@ export default function LegalCode() {
         section.section_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
         section.chapter.toLowerCase().includes(searchQuery.toLowerCase()) ||
         section.section_title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        section.content.toLowerCase().includes(searchQuery.toLowerCase())
+        section.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        section.bns_heading?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        section.bns_description?.toLowerCase().includes(searchQuery.toLowerCase())
       );
       setFilteredSections(filtered);
       setTotalPages(Math.ceil(filtered.length / ITEMS_PER_PAGE));
